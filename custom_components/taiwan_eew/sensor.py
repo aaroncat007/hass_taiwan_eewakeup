@@ -176,43 +176,46 @@ class TaiwanEEWWarningSensor(SensorEntity):
 
         is_clear = data.get("clear") or data.get("alert") in ("clear", "end", "cancel")
 
-        # Parse basic fields
-        magnitude = data.get("magnitude") or data.get("mag") or data.get("scale")
-        arrival = data.get("arrival_time_seconds") or data.get("arrival") or data.get("seconds") or data.get("time_to_wave")
-        epicenter = data.get("epicenter_location") or data.get("epicenter") or data.get("location")
-        self._is_drill = bool(data.get("is_drill", False))
-
-        # Parse coordinates and calculate distance to Home Assistant home GPS location
-        lat = data.get("latitude") or data.get("lat")
-        lon = data.get("longitude") or data.get("lon") or data.get("lng")
-        
-        home_lat = self.hass.config.latitude
-        home_lon = self.hass.config.longitude
-
-        if lat is not None and lon is not None and home_lat is not None and home_lon is not None:
-            try:
-                self._distance_km = calculate_distance(
-                    float(home_lat), float(home_lon),
-                    float(lat), float(lon)
-                )
-            except (ValueError, TypeError):
-                self._distance_km = None
-        else:
-            self._distance_km = None
-
-        self._event_id = str(data.get("event_id") or data.get("id") or "None")
-        try:
-            self._report_num = int(data.get("report_num") or data.get("seq") or data.get("report", 0))
-        except (ValueError, TypeError):
-            self._report_num = 0
-
-        self._epicenter_location = str(epicenter) if epicenter is not None else "None"
-
         if is_clear:
             self._state = "0級"
             self._intensity_value = 0.0
             self._arrival_time_seconds = 0
+            self._epicenter_location = "None"
+            self._distance_km = None
+            self._event_id = "None"
+            self._report_num = 0
+            self._is_drill = False
         else:
+            magnitude = data.get("magnitude") or data.get("mag") or data.get("scale")
+            arrival = data.get("arrival_time_seconds") or data.get("arrival") or data.get("seconds") or data.get("time_to_wave")
+            epicenter = data.get("epicenter_location") or data.get("epicenter") or data.get("location")
+            self._is_drill = bool(data.get("is_drill", False))
+
+            # Parse coordinates and calculate distance to Home Assistant home GPS location
+            lat = data.get("latitude") or data.get("lat")
+            lon = data.get("longitude") or data.get("lon") or data.get("lng")
+            
+            home_lat = self.hass.config.latitude
+            home_lon = self.hass.config.longitude
+
+            if lat is not None and lon is not None and home_lat is not None and home_lon is not None:
+                try:
+                    self._distance_km = calculate_distance(
+                        float(home_lat), float(home_lon),
+                        float(lat), float(lon)
+                    )
+                except (ValueError, TypeError):
+                    self._distance_km = None
+            else:
+                self._distance_km = None
+
+            self._event_id = str(data.get("event_id") or data.get("id") or "None")
+            try:
+                self._report_num = int(data.get("report_num") or data.get("seq") or data.get("report", 0))
+            except (ValueError, TypeError):
+                self._report_num = 0
+
+            self._epicenter_location = str(epicenter) if epicenter is not None else "None"
             self._state = translate_intensity_to_zh(magnitude)
             self._intensity_value = parse_intensity_to_float(magnitude)
             
@@ -241,6 +244,11 @@ class TaiwanEEWWarningSensor(SensorEntity):
         self._state = "0級"
         self._intensity_value = 0.0
         self._arrival_time_seconds = 0
+        self._epicenter_location = "None"
+        self._distance_km = None
+        self._event_id = "None"
+        self._report_num = 0
+        self._is_drill = False
         self.async_write_ha_state()
 
 
