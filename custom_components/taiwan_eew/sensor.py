@@ -8,11 +8,59 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.event import async_call_later
 
-from .const import DOMAIN, translate_intensity_to_zh, parse_intensity_to_float
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
 DEFAULT_RESET_TIMEOUT = 120  # Seconds to wait before resetting values to 0
+
+def translate_intensity_to_zh(intensity_val) -> str:
+    """Translate API level representation to Traditional Chinese."""
+    if intensity_val is None:
+        return "0級"
+    s = str(intensity_val).strip()
+    if not s or s == "0" or s == "0.0":
+        return "0級"
+    
+    mapping = {
+        "1": "1級", "2": "2級", "3": "3級", "4": "4級",
+        "5-": "5弱", "5+": "5強", "6-": "6弱", "6+": "6強", "7": "7級",
+        "5弱": "5弱", "5強": "5強", "6弱": "6弱", "6強": "6強",
+        "1級": "1級", "2級": "2級", "3級": "3級", "4級": "4級", "7級": "7級"
+    }
+    return mapping.get(s, s)
+
+def parse_intensity_to_float(intensity_val) -> float:
+    """Convert Taiwan intensity representation (e.g. 5, '5弱', '5-', '5強', '5+') to float."""
+    if intensity_val is None:
+        return 0.0
+    
+    if isinstance(intensity_val, (int, float)):
+        return float(intensity_val)
+        
+    s = str(intensity_val).strip()
+    if not s:
+        return 0.0
+        
+    try:
+        return float(s)
+    except ValueError:
+        pass
+        
+    if "5-" in s or "5弱" in s or "5minus" in s.lower():
+        return 5.0
+    elif "5+" in s or "5強" in s or "5plus" in s.lower():
+        return 5.5
+    elif "6-" in s or "6弱" in s or "6minus" in s.lower():
+        return 6.0
+    elif "6+" in s or "6強" in s or "6plus" in s.lower():
+        return 6.5
+    
+    for char in s:
+        if char.isdigit():
+            return float(char)
+            
+    return 0.0
 
 def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Calculate distance in kilometers between two GPS coordinates using Haversine formula."""

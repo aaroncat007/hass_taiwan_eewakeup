@@ -17,6 +17,38 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.SENSOR]
 
+def parse_intensity_to_float(intensity_val) -> float:
+    """Convert Taiwan intensity representation (e.g. 5, '5弱', '5-', '5強', '5+') to float."""
+    if intensity_val is None:
+        return 0.0
+    
+    if isinstance(intensity_val, (int, float)):
+        return float(intensity_val)
+        
+    s = str(intensity_val).strip()
+    if not s:
+        return 0.0
+        
+    try:
+        return float(s)
+    except ValueError:
+        pass
+        
+    if "5-" in s or "5弱" in s or "5minus" in s.lower():
+        return 5.0
+    elif "5+" in s or "5強" in s or "5plus" in s.lower():
+        return 5.5
+    elif "6-" in s or "6弱" in s or "6minus" in s.lower():
+        return 6.0
+    elif "6+" in s or "6強" in s or "6plus" in s.lower():
+        return 6.5
+    
+    for char in s:
+        if char.isdigit():
+            return float(char)
+            
+    return 0.0
+
 def generate_tw_headers() -> dict:
     """Generate HMAC-SHA256 signature headers for twearthquake API."""
     ts = str(int(time.time()))
@@ -103,8 +135,9 @@ async def poll_twearthquake(hass: HomeAssistant, base_url: str, location: str, p
                     
                     if has_eq:
                         eq = data.get("Earthquake") or {}
+                        raw_level = eq.get("level")
                         normalized_data = {
-                            "magnitude": eq.get("level"),
+                            "magnitude": raw_level,
                             "arrival_time_seconds": eq.get("second"),
                             "epicenter_location": eq.get("address") or rep.get("na"),
                             "latitude": eq.get("latitude") or rep.get("lat"),
@@ -113,11 +146,12 @@ async def poll_twearthquake(hass: HomeAssistant, base_url: str, location: str, p
                             "report_num": 1,
                             "scale": eq.get("scale") or rep.get("sc"),
                             "depth": eq.get("depth") or rep.get("de"),
-                            "max_level": eq.get("maxlevel") or eq.get("level"),
+                            "max_level": eq.get("maxlevel") or raw_level,
                             "is_drill": eq.get("isDrill", False),
                             "time": eq.get("time") or rep.get("ti"),
                             "has_tsunami": has_tsunami,
                             "tsunami_report": tsunami_report,
+                            "intensity_value": parse_intensity_to_float(raw_level),
                         }
                         _LOGGER.info("Earthquake detected for %s! Dispatching: %s", location, normalized_data)
                         async_dispatcher_send(hass, signal_name, normalized_data)
@@ -144,6 +178,7 @@ async def poll_twearthquake(hass: HomeAssistant, base_url: str, location: str, p
                             "time": rep.get("ti"),
                             "has_tsunami": has_tsunami,
                             "tsunami_report": tsunami_report,
+                            "intensity_value": 0.0,
                         }
                         _LOGGER.debug("No active earthquake. Dispatching last report data: %s", normalized_data)
                         async_dispatcher_send(hass, signal_name, normalized_data)
