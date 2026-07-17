@@ -1,0 +1,5 @@
+DOMAIN = "taiwan_eew"
+SIGNAL_EEW_UPDATE = f"{DOMAIN}_update"
+CONF_LOCATION = "location"
+CONF_POLL_INTERVAL = "poll_interval"
+DEFAULT_TW_URL = "https://twearthquake.zapto.org:30007/eew"
