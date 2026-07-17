@@ -113,6 +113,55 @@
 
 ---
 
+## Lovelace 儀表板顯示範例 (Markdown 敘述卡片)
+
+如果您希望將開發工具中的豐富中文屬性（如震源深度、規模、海嘯警報等）直接顯示在 Home Assistant 的儀表板（Lovelace Dashboard）上，可以使用 **Markdown 記憶卡片** 與 **Jinja 樣板**。
+
+### 設定步驟：
+1. 開啟您的儀表板，點擊右上角 **編輯儀表板**，再點擊 **新增卡片**。
+2. 選擇 **Markdown** 卡片。
+3. 貼入以下 YAML 設定（請依安裝的縣市，將 `taipei` 替換為您的縣市代碼）：
+
+```yaml
+type: markdown
+title: "🚨 台灣地震即時監測"
+content: >-
+  {% if is_state('sensor.taiwan_eew_warning_taipei', '0級') %}
+    ### <font color="green">🟢 目前無地震警報 (監測地區: 台北)</font>
+  {% else %}
+    ### <font color="red">🔴 地震波預警中！預估震度: {{ states('sensor.taiwan_eew_warning_taipei') }}</font>
+    
+    *   **預估抵達時間**: <font color="orange">**{{ state_attr('sensor.taiwan_eew_warning_taipei', '預估波抵達秒數') }} 秒**</font>
+    *   **預測震央地點**: {{ state_attr('sensor.taiwan_eew_warning_taipei', '震央地點') }}
+    *   **預測震央距離**: {{ state_attr('sensor.taiwan_eew_warning_taipei', '震央距離_公里') }} 公里
+    *   **演習警報標記**: {{ state_attr('sensor.taiwan_eew_warning_taipei', '是否為演習') }}
+  {% endif %}
+
+  ***
+
+  ### 📋 最近一次地震報告 (CWA 公報)
+
+  *   **發生時間**: {{ state_attr('sensor.taiwan_eew_last_report_taipei', '地震發生時間') }}
+  *   **震央地點**: {{ state_attr('sensor.taiwan_eew_last_report_taipei', '震央地點') }}
+  *   **芮氏規模**: **{{ state_attr('sensor.taiwan_eew_last_report_taipei', '芮氏規模') }}**
+  *   **震源深度**: {{ state_attr('sensor.taiwan_eew_last_report_taipei', '震源深度_公里') }} 公里
+  *   **全台最大震度**: {{ state_attr('sensor.taiwan_eew_last_report_taipei', '最大震度') }}
+  *   **震央經緯座標**: ({{ state_attr('sensor.taiwan_eew_last_report_taipei', '震央緯度') }}, {{ state_attr('sensor.taiwan_eew_last_report_taipei', '震央經度') }})
+
+  ***
+
+  ### 🌊 海嘯警報狀態
+  *   **海嘯警報發布**: **{{ state_attr('sensor.taiwan_eew_last_report_taipei', '海嘯警報') }}**
+  {% if state_attr('sensor.taiwan_eew_last_report_taipei', '海嘯警報') == '是' %}
+  *   **警報報告內容**: 
+      > {{ state_attr('sensor.taiwan_eew_last_report_taipei', '海嘯報告內容') }}
+  {% endif %}
+```
+
+此卡片會自動在**綠色「🟢 目前無地震警報」**與**紅色「🔴 地震波預警中！」**狀態之間切換，並以清晰易讀的清單列出最新的地震詳細數據。
+
+---
+
 ## 自動化設定範例
 
 ### 範例 A：事件觸發（推薦 🌟 - 超低延遲，適用避難連動）
