@@ -108,9 +108,19 @@ async def poll_twearthquake(hass: HomeAssistant, base_url: str, location: str, p
     url = f"{base_url.rstrip('/')}/{location}"
     signal_name = f"{DOMAIN}_update_{location}"
     
-    # Bypass SSL verification to avoid SSLCertVerificationError
-    connector = aiohttp.TCPConnector(ssl=False)
-    timeout = aiohttp.ClientTimeout(total=3.0)
+    # Enable TCP connection pooling, DNS caching, and SSL bypass for high performance
+    connector = aiohttp.TCPConnector(
+        ssl=False,
+        keepalive_timeout=30.0,
+        ttl_dns_cache=300,
+        limit=10
+    )
+    # Increased timeouts to ensure requests complete during server traffic spikes during earthquakes
+    timeout = aiohttp.ClientTimeout(
+        total=10.0,
+        connect=5.0,
+        sock_read=8.0
+    )
     
     async with aiohttp.ClientSession(connector=connector) as session:
         while True:
@@ -185,7 +195,15 @@ async def poll_twearthquake(hass: HomeAssistant, base_url: str, location: str, p
                         
             except asyncio.CancelledError:
                 break
+            except (asyncio.TimeoutError, TimeoutError):
+                _LOGGER.warning("Timeout connecting to TWEarthquake API for %s (server busy)", location)
+                await asyncio.sleep(0.5)
+                continue
+            except aiohttp.ClientError as err:
+                _LOGGER.warning("Network error polling TWEarthquake API for %s: %s", location, err)
+                await asyncio.sleep(1.0)
+                continue
             except Exception as err:
-                _LOGGER.exception("Error polling TWEarthquake API for %s: %s", location, err)
+                _LOGGER.exception("Unexpected error polling TWEarthquake API for %s: %s", location, err)
                 
             await asyncio.sleep(poll_interval)
