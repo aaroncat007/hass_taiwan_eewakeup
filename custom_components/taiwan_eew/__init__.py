@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.const import Platform
 
-from .const import DOMAIN, DEFAULT_TW_URL
+from .const import API_INITIALIZATION_URL, DOMAIN, DEFAULT_TW_URL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -108,9 +108,8 @@ async def poll_twearthquake(hass: HomeAssistant, base_url: str, location: str, p
     url = f"{base_url.rstrip('/')}/{location}"
     signal_name = f"{DOMAIN}_update_{location}"
     
-    # Enable TCP connection pooling, DNS caching, and SSL bypass for high performance
+    # Enable TCP connection pooling and DNS caching while keeping TLS verification enabled.
     connector = aiohttp.TCPConnector(
-        ssl=False,
         keepalive_timeout=30.0,
         ttl_dns_cache=300,
         limit=10
@@ -123,6 +122,31 @@ async def poll_twearthquake(hass: HomeAssistant, base_url: str, location: str, p
     )
     
     async with aiohttp.ClientSession(connector=connector) as session:
+        # The official website publishes its current API URL in this initialization
+        # response. Keep the known current endpoint as a fallback if discovery fails.
+        try:
+            async with session.get(API_INITIALIZATION_URL, timeout=timeout) as response:
+                response.raise_for_status()
+                initialization = await response.json()
+            discovered_url = (
+                initialization.get("url")
+                if isinstance(initialization, dict)
+                else None
+            )
+            if isinstance(discovered_url, str) and discovered_url.startswith("https://"):
+                url = f"{discovered_url.rstrip('/')}/{location}"
+            else:
+                _LOGGER.warning(
+                    "TWEarthquake API discovery returned no valid URL; using fallback endpoint"
+                )
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as err:
+            _LOGGER.warning(
+                "Could not discover TWEarthquake API endpoint, using fallback endpoint: %s",
+                err,
+            )
+
+        _LOGGER.info("Using TWEarthquake API endpoint: %s", url)
+
         while True:
             try:
                 headers = generate_tw_headers()
